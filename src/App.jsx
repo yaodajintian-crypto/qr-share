@@ -33,10 +33,26 @@ function App() {
   const [idea, setIdea] = useState("");
   const [ideas, setIdeas] = useState([]);
   const [savedRooms, setSavedRooms] = useState([]);
+  const [likedIdeas, setLikedIdeas] = useState([]);
+  const [fontSize, setFontSize] = useState("medium");
+  const [summary, setSummary] = useState("");
+
+  const fontMap = {
+    small: 14,
+    medium: 16,
+    large: 20,
+    xlarge: 24,
+  };
 
   useEffect(() => {
     const saved = JSON.parse(localStorage.getItem("savedRooms") || "[]");
     setSavedRooms(saved);
+
+    const liked = JSON.parse(localStorage.getItem("likedIdeas") || "[]");
+    setLikedIdeas(liked);
+
+    const savedFont = localStorage.getItem("fontSize") || "medium";
+    setFontSize(savedFont);
 
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
@@ -63,7 +79,6 @@ function App() {
 
   const saveRoom = (id) => {
     const saved = JSON.parse(localStorage.getItem("savedRooms") || "[]");
-
     if (saved.includes(id)) return;
 
     const next = [id, ...saved].slice(0, 10);
@@ -117,9 +132,57 @@ function App() {
   };
 
   const likeIdea = async (id) => {
+    const likeKey = `${roomId}-${id}`;
+
+    if (likedIdeas.includes(likeKey)) {
+      alert("このアイデアにはすでにいいねしています");
+      return;
+    }
+
     await updateDoc(doc(db, "rooms", roomId, "ideas", id), {
       likes: increment(1),
     });
+
+    const next = [...likedIdeas, likeKey];
+    localStorage.setItem("likedIdeas", JSON.stringify(next));
+    setLikedIdeas(next);
+  };
+
+  const generateSummary = () => {
+    if (ideas.length === 0) {
+      setSummary("まだアイデアがありません。");
+      return;
+    }
+
+    const texts = ideas.map((item) => item.text);
+    const total = texts.length;
+
+    const popular = [...ideas]
+      .sort((a, b) => (b.likes || 0) - (a.likes || 0))
+      .slice(0, 3);
+
+    const shortIdeas = texts.slice(0, 5).join(" / ");
+
+    const result = `
+投稿数は全部で${total}件です。
+
+主なアイデア：
+${shortIdeas}
+
+いいねが多いアイデア：
+${popular
+  .map((item, index) => `${index + 1}. ${item.text}（${item.likes || 0}いいね）`)
+  .join("\n")}
+
+全体として、参加者から複数の意見が出ており、特にいいねが多い案は優先的に検討する価値があります。
+`;
+
+    setSummary(result);
+  };
+
+  const changeFontSize = (size) => {
+    setFontSize(size);
+    localStorage.setItem("fontSize", size);
   };
 
   const openSavedRoom = (id) => {
@@ -132,11 +195,28 @@ function App() {
     setQrImage("");
     setIdea("");
     setIdeas([]);
+    setSummary("");
   };
 
   return (
-    <div style={{ padding: 20, maxWidth: 520, margin: "0 auto" }}>
-      <h1>QRアイデア共有</h1>
+    <div
+      style={{
+        padding: 20,
+        maxWidth: 560,
+        margin: "0 auto",
+        fontSize: fontMap[fontSize],
+        lineHeight: 1.7,
+      }}
+    >
+      <h1 style={{ fontSize: fontMap[fontSize] + 12 }}>QRアイデア共有</h1>
+
+      <div style={{ marginBottom: 20 }}>
+        <strong>文字サイズ：</strong>
+        <button onClick={() => changeFontSize("small")}>小</button>
+        <button onClick={() => changeFontSize("medium")}>中</button>
+        <button onClick={() => changeFontSize("large")}>大</button>
+        <button onClick={() => changeFontSize("xlarge")}>特大</button>
+      </div>
 
       {!roomId && (
         <>
@@ -148,7 +228,7 @@ function App() {
 
           <div id="reader" style={{ width: 300, marginTop: 20 }}></div>
 
-          <h3>保存済みルーム</h3>
+          <h2>保存済みルーム</h2>
 
           {savedRooms.length === 0 && <p>まだ保存済みルームはありません。</p>}
 
@@ -181,25 +261,59 @@ function App() {
             value={idea}
             onChange={(e) => setIdea(e.target.value)}
             placeholder="アイデアを書く"
-            style={{ width: "100%", padding: 10, marginTop: 20 }}
+            style={{
+              width: "100%",
+              padding: 12,
+              marginTop: 20,
+              fontSize: fontMap[fontSize],
+            }}
           />
 
           <button onClick={sendIdea} style={{ marginTop: 10 }}>
             投稿
           </button>
 
-          <h3>投稿一覧</h3>
+          <h2>投稿一覧</h2>
 
           <ul>
-            {ideas.map((item) => (
-              <li key={item.id} style={{ marginBottom: 12 }}>
-                <div>{item.text}</div>
-                <button onClick={() => likeIdea(item.id)}>
-                  👍 {item.likes || 0}
-                </button>
-              </li>
-            ))}
+            {ideas.map((item) => {
+              const likeKey = `${roomId}-${item.id}`;
+              const alreadyLiked = likedIdeas.includes(likeKey);
+
+              return (
+                <li key={item.id} style={{ marginBottom: 16 }}>
+                  <div>{item.text}</div>
+                  <button
+                    onClick={() => likeIdea(item.id)}
+                    disabled={alreadyLiked}
+                  >
+                    👍 {item.likes || 0}
+                    {alreadyLiked ? " 済み" : ""}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+
+          <hr />
+
+          <h2>AIまとめ</h2>
+          <button onClick={generateSummary}>まとめる</button>
+
+          {summary && (
+            <pre
+              style={{
+                whiteSpace: "pre-wrap",
+                background: "#f2f2f2",
+                padding: 12,
+                marginTop: 10,
+                borderRadius: 8,
+                fontSize: fontMap[fontSize],
+              }}
+            >
+              {summary}
+            </pre>
+          )}
         </>
       )}
     </div>
