@@ -6,6 +6,9 @@ import {
   getFirestore,
   collection,
   addDoc,
+  doc,
+  updateDoc,
+  increment,
   onSnapshot,
   query,
   orderBy,
@@ -29,11 +32,18 @@ function App() {
   const [qrImage, setQrImage] = useState("");
   const [idea, setIdea] = useState("");
   const [ideas, setIdeas] = useState([]);
+  const [savedRooms, setSavedRooms] = useState([]);
 
   useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("savedRooms") || "[]");
+    setSavedRooms(saved);
+
     const params = new URLSearchParams(window.location.search);
     const room = params.get("room");
-    if (room) setRoomId(room);
+    if (room) {
+      setRoomId(room);
+      saveRoom(room);
+    }
   }, []);
 
   useEffect(() => {
@@ -51,9 +61,20 @@ function App() {
     return () => unsubscribe();
   }, [roomId]);
 
+  const saveRoom = (id) => {
+    const saved = JSON.parse(localStorage.getItem("savedRooms") || "[]");
+
+    if (saved.includes(id)) return;
+
+    const next = [id, ...saved].slice(0, 10);
+    localStorage.setItem("savedRooms", JSON.stringify(next));
+    setSavedRooms(next);
+  };
+
   const createRoom = async () => {
     const id = Math.random().toString(36).substring(2, 8);
     setRoomId(id);
+    saveRoom(id);
 
     const url = `${window.location.origin}?room=${id}`;
     const qr = await QRCode.toDataURL(url);
@@ -74,6 +95,7 @@ function App() {
 
         if (room) {
           setRoomId(room);
+          saveRoom(room);
           setQrImage("");
         } else {
           alert("ルームQRではありません");
@@ -87,28 +109,65 @@ function App() {
 
     await addDoc(collection(db, "rooms", roomId, "ideas"), {
       text: idea,
+      likes: 0,
       createdAt: serverTimestamp(),
     });
 
     setIdea("");
   };
 
+  const likeIdea = async (id) => {
+    await updateDoc(doc(db, "rooms", roomId, "ideas", id), {
+      likes: increment(1),
+    });
+  };
+
+  const openSavedRoom = (id) => {
+    setRoomId(id);
+    setQrImage("");
+  };
+
+  const backHome = () => {
+    setRoomId("");
+    setQrImage("");
+    setIdea("");
+    setIdeas([]);
+  };
+
   return (
-    <div style={{ padding: 20, maxWidth: 500, margin: "0 auto" }}>
+    <div style={{ padding: 20, maxWidth: 520, margin: "0 auto" }}>
       <h1>QRアイデア共有</h1>
 
       {!roomId && (
         <>
           <button onClick={createRoom}>作成</button>
+
           <button onClick={startScan} style={{ marginLeft: 10 }}>
             読み込み
           </button>
+
           <div id="reader" style={{ width: 300, marginTop: 20 }}></div>
+
+          <h3>保存済みルーム</h3>
+
+          {savedRooms.length === 0 && <p>まだ保存済みルームはありません。</p>}
+
+          <ul>
+            {savedRooms.map((id) => (
+              <li key={id}>
+                <button onClick={() => openSavedRoom(id)}>
+                  ルームID: {id}
+                </button>
+              </li>
+            ))}
+          </ul>
         </>
       )}
 
       {roomId && (
         <>
+          <button onClick={backHome}>ホームに戻る</button>
+
           <h2>ルームID: {roomId}</h2>
 
           {qrImage && (
@@ -130,9 +189,15 @@ function App() {
           </button>
 
           <h3>投稿一覧</h3>
+
           <ul>
             {ideas.map((item) => (
-              <li key={item.id}>{item.text}</li>
+              <li key={item.id} style={{ marginBottom: 12 }}>
+                <div>{item.text}</div>
+                <button onClick={() => likeIdea(item.id)}>
+                  👍 {item.likes || 0}
+                </button>
+              </li>
             ))}
           </ul>
         </>
