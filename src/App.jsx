@@ -36,6 +36,8 @@ function App() {
   const [likedIdeas, setLikedIdeas] = useState([]);
   const [fontSize, setFontSize] = useState("medium");
   const [summary, setSummary] = useState("");
+  const [ideaFontSize, setIdeaFontSize] = useState(16);
+  const [ideaType, setIdeaType] = useState("text");
 
   const fontMap = {
     small: 14,
@@ -120,17 +122,18 @@ function App() {
   };
 
   const sendIdea = async () => {
-    if (!idea.trim() || !roomId) return;
+  if (!idea.trim() || !roomId) return;
 
-    await addDoc(collection(db, "rooms", roomId, "ideas"), {
-      text: idea,
-      likes: 0,
-      createdAt: serverTimestamp(),
-    });
+  await addDoc(collection(db, "rooms", roomId, "ideas"), {
+    text: idea,
+    likes: 0,
+    type: ideaType,
+    fontSize: ideaFontSize,
+    createdAt: serverTimestamp(),
+  });
 
-    setIdea("");
-  };
-
+  setIdea("");
+};
   const likeIdea = async (id) => {
     const likeKey = `${roomId}-${id}`;
 
@@ -282,8 +285,35 @@ ${popular
 
               return (
                 <li key={item.id} style={{ marginBottom: 16 }}>
-                  <div>{item.text}</div>
-                  <button
+                  {item.type === "text" && (
+  <div style={{ fontSize: item.fontSize || 16 }}>
+    {item.text}
+    </div>
+  )}
+  
+  {item.type === "arrow" && (
+    <div style={{ fontSize: item.fontSize || 24 }}>
+      ➜ {item.text}
+      </div>
+    )}
+    
+    {item.type === "bar" && (
+      <div>
+        <div style={{ fontSize: item.fontSize || 16 }}>
+          {item.text}
+          </div>
+          <div
+          style={{
+            width: `${Math.min((item.likes || 1) * 30, 300)}px`,
+            height: 20,
+            background: "#4caf50",
+            marginTop: 6,
+            borderRadius: 4,
+          }}
+          />
+          </div>
+        )}
+                  <button>
                     onClick={() => likeIdea(item.id)}
                     disabled={alreadyLiked}
                   >
