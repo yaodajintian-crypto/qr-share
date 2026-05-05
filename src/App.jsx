@@ -291,28 +291,34 @@ ${popular
     </div>
   )}
   
-  {item.type === "arrow" && (
-    <div style={{ fontSize: item.fontSize || 24 }}>
-      ➜ {item.text}
-      </div>
-    )}
-    
-    {item.type === "bar" && (
-      <div>
-        <div style={{ fontSize: item.fontSize || 16 }}>
-          {item.text}
-          </div>
-          <div
-          style={{
-            width: `${Math.min((item.likes || 1) * 30, 300)}px`,
-            height: 20,
-            background: "#4caf50",
-            marginTop: 6,
-            borderRadius: 4,
-          }}
-          />
-          </div>
-        )}
+  {item.type === "text" && (
+  <div style={{ fontSize: item.fontSize || 16 }}>
+    {item.text}
+  </div>
+)}
+
+{item.type === "arrow" && (
+  <div style={{ fontSize: item.fontSize || 24 }}>
+    ➜ {item.text}
+  </div>
+)}
+
+{item.type === "bar" && (
+  <div>
+    <div style={{ fontSize: item.fontSize || 16 }}>
+      {item.text}
+    </div>
+    <div
+      style={{
+        width: `${Math.min((item.likes || 1) * 30, 300)}px`,
+        height: 20,
+        background: "#4caf50",
+        marginTop: 6,
+        borderRadius: 4,
+      }}
+    />
+  </div>
+)}
                   <button>
                     onClick={() => likeIdea(item.id)}
                     disabled={alreadyLiked}
